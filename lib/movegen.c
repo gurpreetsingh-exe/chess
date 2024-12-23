@@ -90,6 +90,7 @@ Bitboard pawn_attacks_mask(Square sq, Color side) {
   } else {
     assert(false && "invalid side");
   }
+  __builtin_unreachable();
 }
 
 Bitboard knight_attacks_mask(Square sq) {
@@ -141,21 +142,6 @@ Bitboard rook_attacks_mask(Square sq) {
   return attacks & ~(1ULL << sq);
 }
 
-// void pawn_moves(MoveList moves, Color color) {
-//   const Bitboard empty = EMPTY_SQUARES;
-//   if (color) {
-//     Bitboard bb = piece[PC_B_PAWN] & RANK_7;
-//     Bitboard single_push = bb >> 8;
-//     Bitboard double_push = (single_push >> 8) & empty & RANK_5;
-//     print_attack_bitboard(bb, single_push | double_push);
-//   } else {
-//     Bitboard bb = piece[PC_W_PAWN] & RANK_2;
-//     Bitboard single_push = (bb << 8) & empty;
-//     Bitboard double_push = (single_push << 8) & empty & RANK_4;
-//     print_attack_bitboard(bb, single_push | double_push);
-//   }
-// }
-
 Bitboard quiet_pawn_moves(Square sq, Color color) {
   Bitboard pawnbb = SQBB(sq);
   Bitboard movebb = 0ULL;
@@ -176,103 +162,100 @@ Bitboard quiet_pawn_moves(Square sq, Color color) {
   return movebb;
 }
 
-void generate_moves(MoveList* moves) {
+void generate_moves(Moves* moves) {
+  Bitboard checkers = checkers_bb;
+  Bitboard blockers = EMPTY;
+  if (checkers) {
+    Bitboard b = EMPTY;
+    while (checkers) {
+      int kingsq = PC_SQUARE(PTY_KING, side_to_move);
+      int checkersq = pop_lsb(&checkers);
+      b |= between_bb(checkersq, kingsq);
+    }
+    blockers |= b;
+  }
+  // if (!MORE_THAN_ONE()) {
+
+  // }
+
   for (int from = 0; from < 64; ++from) {
     Piece pc = board[from];
     if (PC_COLOR(pc) != side_to_move) {
       continue;
     }
 
-    Bitboard bb = piece[pc];
     Bitboard b = EMPTY;
-    if (pc == PC_W_PAWN) {
-      b |= quiet_pawn_moves(from, WHITE);
-    } else if (pc == PC_B_PAWN) {
-      b |= quiet_pawn_moves(from, BLACK);
+    PieceType pt = PC_TYPE(pc);
+    if (pc == PC_B_PAWN) {
+      b = (pawn_attacks(from, BLACK) & OPPONENT) |
+          quiet_pawn_moves(from, BLACK);
+      if (enpassant != -1 && (pawn_attacks(from, BLACK) & SQBB(enpassant))) {
+        MOVE_APPEND(moves, MOVE(from, enpassant, EN_PASSANT));
+      }
+    } else if (pc == PC_W_PAWN) {
+      b = (pawn_attacks(from, WHITE) & OPPONENT) |
+          quiet_pawn_moves(from, WHITE);
+      if (enpassant != -1 && (pawn_attacks(from, WHITE) & SQBB(enpassant))) {
+        MOVE_APPEND(moves, MOVE(from, enpassant, EN_PASSANT));
+      }
+    } else {
+      b = attacks_bb(pt, from, OCCUPIED_SQUARES) & ~US;
     }
-    b |= attacks_bb(from);
+
+    if (checkers_bb && pt != PTY_KING) {
+      b &= blockers | checkers_bb;
+    } else if (pt == PTY_KING) {
+      b &= ~attacked_bb;
+    }
+
+    if (GET_BIT(pins[side_to_move], from)) {
+      Bitboard kingbb = piece[MAKE_PC(PTY_KING, side_to_move)];
+      int kingsq = pop_lsb(&kingbb);
+      Bitboard pinner = pinners[side_to_move ^ BLACK];
+      while (pinner) {
+        int pinnersq = pop_lsb(&pinner);
+        b &= between_bb(pinnersq, kingsq) | SQBB(pinnersq);
+      }
+    }
+
     while (b) { MOVE_APPEND(moves, MOVE(from, pop_lsb(&b), 0)); }
+    if (!castling || checkers_bb) {
+      continue;
+    }
+
+    if (pc == PC_W_KING) {
+      if (castling & CASTLE_W_KINGSIDE && board[f1] == NO_PIECE &&
+          board[g1] == NO_PIECE) {
+        MOVE_APPEND(moves, MOVE(from, g1, CASTLING));
+      }
+      if (castling & CASTLE_W_QUEENSIDE && board[b1] == NO_PIECE &&
+          board[c1] == NO_PIECE && board[d1] == NO_PIECE) {
+        MOVE_APPEND(moves, MOVE(from, c1, CASTLING));
+      }
+    } else if (pc == PC_B_KING) {
+      if (castling & CASTLE_B_KINGSIDE && board[f8] == NO_PIECE &&
+          board[g8] == NO_PIECE) {
+        MOVE_APPEND(moves, MOVE(from, g8, CASTLING));
+      }
+      if (castling & CASTLE_B_QUEENSIDE && board[b8] == NO_PIECE &&
+          board[c8] == NO_PIECE && board[d8] == NO_PIECE) {
+        MOVE_APPEND(moves, MOVE(from, c8, CASTLING));
+      }
+    }
   }
 }
 
-// void generate_moves(MoveList* moves) {
-//   for (int p = NO_PIECE; p < PIECE_NB; ++p) {
-//     Bitboard bb = piece[p];
-//     if (side_to_move == WHITE) {
-//       if (p == PC_W_PAWN) {
-//         while (bb) {
-//           int from = pop_lsb(&bb);
-//           Bitboard pawnbb = 1ULL << from;
-//           if ((pawnbb << 8) & EMPTY_SQUARES) {
-//             MOVE_APPEND(moves, MOVE(from, from + 8, 0));
-//             if ((pawnbb & RANK_2) && (pawnbb << 16) & EMPTY_SQUARES) {
-//               MOVE_APPEND(moves, MOVE(from, from + 16, 0));
-//             }
-//           }
-//         }
-//       }
-//     } else {
-//       if (p == PC_B_PAWN) {
-//         while (bb) {
-//           int from = pop_lsb(&bb);
-//           Bitboard pawnbb = 1ULL << from;
-//           if ((pawnbb >> 8) & EMPTY_SQUARES) {
-//             MOVE_APPEND(moves, MOVE(from, from - 8, 0));
-//             if ((pawnbb & RANK_7) && (pawnbb >> 16) & EMPTY_SQUARES) {
-//               MOVE_APPEND(moves, MOVE(from, from - 16, 0));
-//             }
-//           }
-//         }
-//       } else if (p == PC_B_KNIGHT) {
-//         while (bb) {
-//           int from = pop_lsb(&bb);
-//           Bitboard b = knight_attacks(from) & ~US;
-//           while (b) { MOVE_APPEND(moves, MOVE(from, pop_lsb(&b), 0)); }
-//         }
-//       } else if (p == PC_B_BISHOP) {
-//         while (bb) {
-//           int from = pop_lsb(&bb);
-//           Bitboard b = bishop_attacks(from, OCCUPIED_SQUARES) & ~US;
-//           while (b) { MOVE_APPEND(moves, MOVE(from, pop_lsb(&b), 0)); }
-//         }
-//       } else if (p == PC_B_ROOK) {
-//         while (bb) {
-//           int from = pop_lsb(&bb);
-//           Bitboard b = rook_attacks(from, OCCUPIED_SQUARES) & ~US;
-//           while (b) { MOVE_APPEND(moves, MOVE(from, pop_lsb(&b), 0)); }
-//         }
-//       } else if (p == PC_B_QUEEN) {
-//         while (bb) {
-//           int from = pop_lsb(&bb);
-//           Bitboard b = queen_attacks(from, OCCUPIED_SQUARES) & ~US;
-//           while (b) { MOVE_APPEND(moves, MOVE(from, pop_lsb(&b), 0)); }
-//         }
-//       }
-//     }
-//   }
-// }
-
-Bitboard attacks_bb(Square from) {
-  if (COLOR_AT(from) != side_to_move) {
-    return 0ULL;
-  }
-  switch (board[from]) {
-    case PC_B_QUEEN:
-    case PC_W_QUEEN: return queen_attacks(from, OCCUPIED_SQUARES) & ~US;
-    case PC_B_ROOK:
-    case PC_W_ROOK: return rook_attacks(from, OCCUPIED_SQUARES) & ~US;
-    case PC_B_BISHOP:
-    case PC_W_BISHOP: return bishop_attacks(from, OCCUPIED_SQUARES) & ~US;
-    case PC_B_PAWN: return pawn_attacks(from, BLACK) & OPPONENT;
-    case PC_W_PAWN: return pawn_attacks(from, WHITE) & OPPONENT;
-    // case PC_B_PAWN: return quiet_pawn_moves(from, BLACK);
-    // case PC_W_PAWN: return quiet_pawn_moves(from, WHITE);
-    case PC_B_KNIGHT:
-    case PC_W_KNIGHT: return knight_attacks(from) & ~US;
-    case PC_B_KING:
-    case PC_W_KING: return king_attacks(from) & ~US;
+Bitboard attacks_bb(PieceType pt, Square from, Bitboard occ) {
+  assert(pt != PTY_PAWN && "pawn moves in attacks_bb()");
+  switch (pt) {
+    case PTY_QUEEN: return queen_attacks(from, occ);
+    case PTY_ROOK: return rook_attacks(from, occ);
+    case PTY_BISHOP: return bishop_attacks(from, occ);
+    case PTY_KING: return king_attacks(from);
+    case PTY_KNIGHT: return knight_attacks(from);
+    case PTY_PAWN: assert(false && "pawn moves in attacks_bb()");
     case NO_PIECE: return 0;
-    case PIECE_NB: return 0;
+    case PIECE_TYPE_NB: return 0;
   }
 
   return 0;
@@ -421,10 +404,26 @@ void init_slider_attacks() {
   }
 }
 
-void print_moves() {
-  MoveList moves = MAKE_MOVE_LIST();
+Bitboard get_moves(Square sq) {
+  Bitboard attacks = EMPTY;
+  Moves moves;
+  MOVE_INIT(moves);
   generate_moves(&moves);
-  printf("moves: %zu\n", moves.length);
-  for (size_t i = 0; i < moves.length; ++i) { print_move(moves.inner[i]); }
-  free(moves.inner);
+  for (size_t i = 0; i < moves.end - moves.inner; ++i) {
+    Move move = moves.inner[i];
+    if (MOVE_FROM(move) == sq) {
+      SET_BIT(attacks, MOVE_TO(move));
+    }
+  }
+  return attacks;
+}
+
+void print_moves() {
+  Moves moves;
+  MOVE_INIT(moves);
+  generate_moves(&moves);
+  printf("moves: %zu\n", moves.end - moves.inner);
+  for (size_t i = 0; i < moves.end - moves.inner; ++i) {
+    print_move(moves.inner[i]);
+  }
 }

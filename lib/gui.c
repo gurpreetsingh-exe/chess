@@ -6,6 +6,7 @@
 
 #include "bitboard.h"
 #include "board.h"
+#include "move.h"
 #include "movegen.h"
 #include "types.h"
 
@@ -48,8 +49,12 @@ GLFWwindow* window;
 bool quit = false;
 GLuint program;
 GLuint gl_piece_textures[ARRLEN(piece_textures)];
-int attacks[64];
+int attacks[SQ_NB];
+Piece grabbed_piece = NO_PIECE;
 int active = -1;
+Piece gboard[SQ_NB];
+Move move;
+Bitboard legal_moves = EMPTY;
 
 GLuint create_shader(GLuint type, const char* source) {
   GLuint shader = glCreateShader(type);
@@ -136,8 +141,6 @@ GLuint load_texture(const char* path) {
 
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-  // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-  // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
   glTexImage2D(GL_TEXTURE_2D, 0, internal_format, w, h, 0, format, GL_FLOAT,
                data);
 
@@ -211,17 +214,66 @@ void highlight_squares(Bitboard bb) {
 }
 
 void update_attacks() {
-  highlight_squares(active != -1 ? attacks_bb(active) : 0ULL);
+  highlight_squares(active != -1 ? get_moves(active) : 0ULL);
 }
 
+Piece gtake_piece(Square sq) {
+  Piece pc = gboard[sq];
+  gboard[sq] = NO_PIECE;
+  return pc;
+}
+
+void gput_piece(Piece pc, Square sq) { gboard[sq] = pc; }
+
 void mouse_button_callback(GLFWwindow* win, int button, int action, int mods) {
-  if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
-    if (active == get_square()) {
-      return;
+  if (button == GLFW_MOUSE_BUTTON_LEFT) {
+    if (action == GLFW_PRESS) {
+      if (active == get_square()) {
+        grabbed_piece = gtake_piece(active);
+        move = MOVE(active, 0, 0);
+        return;
+      }
+      active = get_square();
+      glUniform1i(glGetUniformLocation(program, "u_active"), active);
+      update_attacks();
+      grabbed_piece = gtake_piece(active);
+      move = MOVE(active, 0, 0);
+    } else if (action == GLFW_RELEASE) {
+      if (grabbed_piece == NO_PIECE) {
+        return;
+      }
+      int from = MOVE_FROM(move);
+      int to = get_square();
+      if (!(get_moves(from) & SQBB(to))) {
+        gput_piece(grabbed_piece, from);
+        grabbed_piece = 0;
+        return;
+      }
+      int move_type = NORMAL;
+      if (PC_TYPE(board[from]) == PTY_KING) {
+        if (abs(from - to) == 2) {
+          move_type = CASTLING;
+        }
+      } else if (PC_TYPE(board[from]) == PTY_PAWN) {
+        if (board[to] == NO_PIECE) {
+          if (abs(to - from) == 9 || abs(to - from) == 7) {
+            move_type = EN_PASSANT;
+          }
+        }
+      }
+      gput_piece(grabbed_piece, to);
+      Move m = MOVE(from, to, move_type);
+      make_move(m);
+      // TODO: maybe precalculate all the legal moves for the next turn
+      // here
+      memcpy(gboard, board, sizeof(board));
+      grabbed_piece = 0;
+      if (active == to) {
+        return;
+      }
+      active = -1;
+      update_attacks();
     }
-    active = get_square();
-    glUniform1i(glGetUniformLocation(program, "u_active"), active);
-    update_attacks();
   }
 }
 
@@ -242,10 +294,39 @@ void key_callback(GLFWwindow* win, int key, int scancode, int action,
     case GLFW_KEY_O: {
       highlight_squares(OPPONENT);
     } break;
+    case GLFW_KEY_RIGHT: {
+      if (!(*prev_moves.end)) {
+        return;
+      }
+      make_move(*prev_moves.end);
+      memcpy(gboard, board, sizeof(board));
+    } break;
+    case GLFW_KEY_LEFT: {
+      if (prev_moves.inner >= prev_moves.end) {
+        return;
+      }
+      Move m = *(prev_moves.end - 1);
+      if (!m) {
+        return;
+      }
+      unmake_move(m);
+      memcpy(gboard, board, sizeof(board));
+    } break;
+    case GLFW_KEY_A: {
+      highlight_squares(attacked_bb);
+    } break;
+    case GLFW_KEY_B: {
+      highlight_squares(pins[BLACK] | pins[WHITE]);
+    } break;
+    case GLFW_KEY_P: {
+      highlight_squares(pinners[BLACK] | pinners[WHITE]);
+    } break;
   }
 }
 
 int main() {
+  engine_start();
+  return 0;
   if (!glfwInit()) {
     return -1;
   }
@@ -263,7 +344,10 @@ int main() {
     printf("GL version: %s\n", (const char*)glGetString(GL_VERSION));
   }
 
-  engine_start();
+  // engine_start();
+  // reset_position();
+  // set_position("4r2k/8/8/8/4B3/8/8/4K3 w - -");
+  memcpy(gboard, board, sizeof(board));
   char* vertex_source = read_file("shader/vertex.glsl");
   char* fragment_source = read_file("shader/fragment.glsl");
   setup_shader(vertex_source, fragment_source);
@@ -287,7 +371,12 @@ int main() {
     glClear(GL_COLOR_BUFFER_BIT);
     glClearColor(1.0f, 0.0f, 1.0f, 1.0f);
 
-    glUniform1iv(glGetUniformLocation(program, "u_board"), 64, board);
+    glUniform1iv(glGetUniformLocation(program, "u_board"), 64, gboard);
+    glUniform1i(glGetUniformLocation(program, "u_grabbed_piece"),
+                grabbed_piece);
+    double x, y;
+    glfwGetCursorPos(window, &x, &y);
+    glUniform2f(glGetUniformLocation(program, "u_mouse"), x, y);
     glDrawArrays(GL_TRIANGLES, 0, 3);
 
     glfwSwapBuffers(window);

@@ -35,35 +35,6 @@ size_t find_piece(char token) {
   return PIECE_NOT_FOUND;
 }
 
-int count_bits(Bitboard bb) {
-  int count = 0;
-  while (bb) {
-    count++;
-    bb &= bb - 1;
-  }
-  return count;
-}
-
-int lsb(Bitboard bb) {
-  assert(bb);
-#if defined(__GNUC__)
-  return __builtin_ctzll(bb);
-#elif defined(_MSC_VER)
-  unsigned long idx;
-  _BitScanForward64(&idx, b);
-  return idx;
-#else
-  return count_bits((bb & -bb) - 1);
-#endif
-}
-
-int pop_lsb(Bitboard* bb) {
-  assert(*bb);
-  const int s = lsb(*bb);
-  *bb &= *bb - 1;
-  return s;
-}
-
 uint32_t xor_shift_random32() {
   static uint32_t state = 3574335;
   uint32_t n = state;

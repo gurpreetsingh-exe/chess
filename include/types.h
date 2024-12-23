@@ -1,14 +1,14 @@
 #pragma once
 
-#include "bitboard.h"
 #include <time.h>
 
 constexpr int GRID_SIZE = 8;
 constexpr int MAX_INPUT_SIZE = 128;
-constexpr int MAX_MOVES_COUNT = 512;
+constexpr int MAX_MOVES_COUNT = 256;
 
 #define PIECE_NOT_FOUND 50
 #define PC_TYPE(p) (p & 7)
+#define MAKE_PC(pt, c) ((c << 3) + pt)
 
 extern int scope;
 
@@ -111,14 +111,18 @@ typedef enum Castling : uint8_t {
   CASTLE_B_KINGSIDE = 1 << 4,
 } Castling;
 
+typedef enum MoveType : uint16_t {
+  NORMAL = 0,
+  PROMOTION = 1,
+  EN_PASSANT = 2,
+  CASTLING = 3
+} MoveType;
+
 extern const char* square_to_string[];
 extern const char* piece_to_name[];
 extern const char* piece_to_string[];
 extern const char* piece_to_char;
 
 size_t find_piece(char);
-int count_bits(Bitboard);
-int lsb(Bitboard);
-int pop_lsb(Bitboard*);
 uint32_t xor_shift_random32();
 uint64_t get_random();

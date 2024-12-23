@@ -35,7 +35,7 @@ target_compile_options(chess PRIVATE
 
     -Werror=missing-field-initializers
 
-    -fsanitize=address
+    $<$<CONFIG:Debug>:-fsanitize=address>
 )
 
 if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
@@ -54,14 +54,15 @@ if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
 endif()
 
 target_precompile_headers(chess PRIVATE "${CMAKE_SOURCE_DIR}/include/base.h")
-target_link_options(chess PRIVATE -fsanitize=address)
+target_link_options(chess PRIVATE $<$<CONFIG:Debug>:-fsanitize=address>)
 target_include_directories(chess PUBLIC "${CMAKE_SOURCE_DIR}/include")
 
 set(THIRD_PARTY "${CMAKE_SOURCE_DIR}/third-party")
 
 add_executable(gui ${GUI_SOURCE} ${THIRD_PARTY}/stbi/stb_image.c)
+target_compile_options(gui PRIVATE -ggdb3)
 target_include_directories(gui PRIVATE ${THIRD_PARTY}/stbi)
 target_precompile_headers(gui PRIVATE "${CMAKE_SOURCE_DIR}/include/base.h")
-target_link_options(gui PRIVATE -fsanitize=address)
+target_link_options(gui PRIVATE $<$<CONFIG:Debug>:-fsanitize=address>)
 find_package(OpenGL REQUIRED)
 target_link_libraries(gui chess glfw OpenGL::GL GLEW m)

@@ -1,4 +1,5 @@
 #include "bitboard.h"
+#include "board.h"
 #include "movegen.h"
 #include "types.h"
 
@@ -47,6 +48,67 @@ void print_bitboard(Bitboard bb) {
   for (int i = 0; i < 17; ++i) { printf("%s", chars.vbar); }
   printf("%s\n", chars.bottomright);
   printf("      a b c d e f g h\n\n");
+}
+
+Bitboard between_bb(Square sq1, Square sq2) {
+  const Bitboard m1 = -1ULL;
+  const Bitboard a2a7 = 0x0001010101010100ULL;
+  const Bitboard b2g7 = 0x0040201008040200ULL;
+  const Bitboard h1b7 = 0x0002040810204080ULL;
+  Bitboard btwn, line, rank, file;
+
+  btwn = (m1 << sq1) ^ (m1 << sq2);
+  file = (sq2 & 7) - (sq1 & 7);
+  rank = ((sq2 | 7) - sq1) >> 3;
+  line = ((file & 7) - 1) & a2a7;
+  line += 2 * (((rank & 7) - 1) >> 58);
+  line += (((rank - file) & 15) - 1) & b2g7;
+  line += (((rank + file) & 15) - 1) & h1b7;
+  line *= btwn & -btwn;
+  return line & btwn;
+}
+
+Bitboard attackers_to(Square sq, Bitboard occ) {
+  return (pawn_attacks(sq, BLACK) & piece[PC_W_PAWN]) |
+         (pawn_attacks(sq, WHITE) & piece[PC_B_PAWN]) |
+         (knight_attacks(sq) & type[PTY_KNIGHT]) |
+         (rook_attacks(sq, occ) & (type[PTY_ROOK] | type[PTY_QUEEN])) |
+         (bishop_attacks(sq, occ) & (type[PTY_BISHOP] | type[PTY_QUEEN])) |
+         (king_attacks(sq) & type[PTY_KING]);
+}
+
+// Bitboard attacked_squares(Square sq) {
+//     return
+// }
+
+int count_bits(Bitboard bb) {
+  int count = 0;
+  while (bb) {
+    count++;
+    bb &= bb - 1;
+  }
+  return count;
+}
+
+int lsb(Bitboard bb) {
+  assert(bb);
+#if defined(__GNUC__)
+  return __builtin_ctzll(bb);
+#elif defined(_MSC_VER)
+  unsigned long idx;
+  _BitScanForward64(&idx, b);
+  return idx;
+#else
+  return count_bits((bb & -bb) - 1);
+#endif
+}
+
+int pop_lsb(Bitboard* bb) {
+  ASAN_BREAKPOINT(*bb);
+  assert(*bb);
+  const int s = lsb(*bb);
+  *bb &= *bb - 1;
+  return s;
 }
 
 void print_attack_bitboard(Bitboard bb, Bitboard attack_bb) {

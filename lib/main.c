@@ -19,10 +19,55 @@ Bitboard rank_mask(int sq) { return 0xffULL << (sq & 56); }
 
 Bitboard file_mask(int sq) { return 0x0101010101010101ULL << (sq & 7); }
 
+size_t perft(int depth) {
+  Moves moves;
+  MOVE_INIT(moves);
+  size_t nodes = 0;
+
+  if (depth == 0) {
+    return 1;
+  }
+
+  generate_moves(&moves);
+  for (size_t i = 0; i < moves.end - moves.inner; i++) {
+    Move move = moves.inner[i];
+    make_move(move);
+    nodes += perft(depth - 1);
+    unmake_move(move);
+  }
+  return nodes;
+}
+
+void print_perft(int depth) {
+  printf("perft(%d) = %zu\n", depth, perft(depth));
+}
+
 int engine_start() {
   TIME("init_leaper_attacks", init_leaper_attacks());
   TIME("init_slider_attacks", init_slider_attacks());
   setup_starting_position();
+
+  // 0     1
+  // 1     20
+  // 2     400
+  // 3     8,902
+  // 4     197,281
+  // 5     4,865,609
+  // 6     119,060,324
+  // 7     3,195,901,860
+  // 8     84,998,978,956
+  // 9     2,439,530,234,167
+  // 10    69,352,859,712,417
+  // 11    2,097,651,003,696,806
+  // 12    62,854,969,236,701,747
+  // 13    1,981,066,775,000,396,239
+  // 14    61,885,021,521,585,529,237
+  // 15    2,015,099,950,053,364,471,960
+
+  print_perft(5);
+  // for (int i = 0; i < 8; ++i) {
+  //   TIME("perft", { print_perft(i); });
+  // }
 
   // print_attack_bitboard(bb, pawn_attacks(bb, WHITE));
   // SET_BIT(bb, a4);

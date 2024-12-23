@@ -1,11 +1,14 @@
 #pragma once
 
+#include "types.h"
+
 typedef uint64_t Bitboard;
 
 #define GET_BIT(n, bit) ((n & (1ULL << (bit))) >> (bit))
 #define SET_BIT(n, bit) (n |= (1ULL << (bit)))
 #define FLIP_BIT(n, bit) (n ^= (1ULL << (bit)))
 #define POP_BIT(n, bit) (GET_BIT(n, bit) ? n ^= (1ULL << (bit)) : 0)
+#define MORE_THAN_ONE(n) ((n) & ((n)-1))
 
 #define SQBB(i) (1ULL << (i))
 
@@ -37,6 +40,11 @@ typedef uint64_t Bitboard;
 
 // (__builtin_popcountll)
 
+int count_bits(Bitboard);
+int lsb(Bitboard);
+int pop_lsb(Bitboard*);
 void print_bitboard(Bitboard);
 void print_attack_bitboard(Bitboard, Bitboard);
+Bitboard between_bb(Square, Square);
+Bitboard attackers_to(Square, Bitboard);
 Bitboard find_magic_number(int, int, bool);
