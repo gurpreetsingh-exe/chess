@@ -24,11 +24,11 @@ size_t perft(int depth) {
   MOVE_INIT(moves);
   size_t nodes = 0;
 
-  if (depth == 0) {
-    return 1;
+  generate_moves(&moves);
+  if (depth == 1) {
+    return (size_t)(moves.end - moves.inner);
   }
 
-  generate_moves(&moves);
   for (size_t i = 0; i < moves.end - moves.inner; i++) {
     Move move = moves.inner[i];
     make_move(move);

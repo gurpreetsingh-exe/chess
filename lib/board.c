@@ -11,7 +11,6 @@ Bitboard color_bb[COLOR_NB];
 Bitboard pins[COLOR_NB];
 Bitboard pinners[COLOR_NB];
 Bitboard checkers_bb;
-Bitboard attacked_bb;
 Moves prev_moves;
 
 StateInfo state_info[MAX_MOVES_COUNT];
@@ -38,7 +37,7 @@ void setup_starting_position() { set_position(start_fen); }
 static void update_pins(Color c) {
   pins[c] = EMPTY;
   pinners[c ^ BLACK] = EMPTY;
-  Square king_sq = find_square(PTY_KING, c);
+  Square king_sq = PC_SQUARE(PTY_KING, c);
   Bitboard pinner =
       ((attacks_bb(PTY_ROOK, king_sq, 0) & (type[PTY_QUEEN] | type[PTY_ROOK])) |
        (attacks_bb(PTY_BISHOP, king_sq, 0) &
@@ -47,7 +46,7 @@ static void update_pins(Color c) {
   Bitboard occ = type[ALL_PIECES] ^ pinner ^ piece[MAKE_PC(PTY_KING, c)];
   pins[c] = EMPTY;
   while (pinner) {
-    int sq = pop_lsb(&pinner);
+    int sq = lsb(pinner);
     Bitboard b = between_bb(sq, king_sq) & occ;
     if (b && !MORE_THAN_ONE(b)) {
       pins[c] |= b;
@@ -55,37 +54,16 @@ static void update_pins(Color c) {
         pinners[c ^ BLACK] |= SQBB(sq);
       }
     }
+    POP_LSB(pinner);
   }
 }
 
 void update_check_info() {
   Color us = side_to_move;
   Color them = side_to_move ^ BLACK;
-  update_pins(WHITE);
-  update_pins(BLACK);
+  update_pins(them);
   checkers_bb =
       attackers_to(PC_SQUARE(PTY_KING, them), type[ALL_PIECES]) & color_bb[us];
-}
-
-void update_state() {
-  attacked_bb = EMPTY;
-  for (int pc = 0; pc < PIECE_NB; ++pc) {
-    if (PC_COLOR(pc) != side_to_move ^ BLACK) {
-      continue;
-    }
-    Bitboard bb = piece[pc];
-    while (bb) {
-      int sq = pop_lsb(&bb);
-      Piece p = board[sq];
-      if (PC_TYPE(p) == PTY_PAWN) {
-        attacked_bb |= pawn_attacks(sq, side_to_move ^ BLACK);
-      } else {
-        attacked_bb |= attacks_bb(PC_TYPE(p), sq,
-                                  OCCUPIED_SQUARES &
-                                      ~piece[MAKE_PC(PTY_KING, side_to_move)]);
-      }
-    }
-  }
 }
 
 void put_piece(Piece pc, Square square) {
@@ -116,11 +94,6 @@ Castling square_to_castling_side(Square sq) {
     default: return NO_CASTLE;
   }
   POP_IGNORE_WARNING()
-}
-
-Square find_square(PieceType pt, Color c) {
-  Bitboard bb = piece[MAKE_PC(pt, c)];
-  return pop_lsb(&bb);
 }
 
 void make_move(Move move) {
@@ -176,7 +149,6 @@ void make_move(Move move) {
   put_piece(pc, to);
   update_check_info();
   side_to_move = side_to_move ^ BLACK;
-  update_state();
   MOVE_APPEND(&prev_moves, move);
   si_current_idx++;
 }
@@ -212,7 +184,6 @@ void unmake_move(Move move) {
   enpassant =
       si_current_idx >= 1 ? state_info[si_current_idx - 1].enpassant : -1;
   update_check_info();
-  update_state();
 }
 
 Castling char_to_castling(char c) {
@@ -236,7 +207,6 @@ void reset_position() {
   memset(pins, 0, sizeof(pins));
   memset(pinners, 0, sizeof(pinners));
   checkers_bb = EMPTY;
-  attacked_bb = EMPTY;
 
   memset(state_info, 0, sizeof(state_info));
   MOVE_INIT(prev_moves);
@@ -272,7 +242,6 @@ void set_position(const char* fen) {
   if (!fen[i++]) {
     castling = 0;
     update_check_info();
-    update_state();
     return;
   }
 
@@ -287,7 +256,6 @@ void set_position(const char* fen) {
   }
 
   update_check_info();
-  update_state();
 }
 
 #if 0

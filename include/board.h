@@ -15,7 +15,6 @@ extern Bitboard color_bb[COLOR_NB];
 extern Bitboard pins[COLOR_NB];
 extern Bitboard pinners[COLOR_NB];
 extern Bitboard checkers_bb;
-extern Bitboard attacked_bb;
 extern const char* start_fen;
 extern Moves prev_moves;
 
@@ -32,20 +31,15 @@ extern size_t si_current_idx;
 #define OCCUPIED_SQUARES type[ALL_PIECES]
 #define EMPTY_SQUARES ~OCCUPIED_SQUARES
 #define US color_bb[side_to_move]
-#define OPPONENT color_bb[1 - side_to_move]
+#define OPPONENT color_bb[side_to_move ^ BLACK]
 #define PC_COLOR(pc) (pc) >> 3
 #define COLOR_AT(square) PC_COLOR(board[(square)])
-#define PC_SQUARE(pt, c)                                                       \
-  ({                                                                           \
-    Bitboard __bb = piece[MAKE_PC(pt, c)];                                     \
-    pop_lsb(&__bb);                                                            \
-  })
+#define PC_SQUARE(pt, c) lsb(piece[MAKE_PC(pt, c)])
 
 void setup_starting_position();
 void put_piece(Piece, Square);
 Piece take_piece(Square);
 void reset_position();
-Square find_square(PieceType, Color);
 void set_position(const char* /* fen */);
 void make_move(Move);
 void unmake_move(Move);

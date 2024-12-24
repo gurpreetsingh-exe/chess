@@ -70,7 +70,6 @@ Bitboard set_occupancy(int index, int nbits, Bitboard attacks) {
   for (int i = 0; i < nbits; ++i) {
     int sq = lsb(attacks);
     POP_BIT(attacks, sq);
-    // pop_lsb(&attacks);
     if (index & (1 << i)) {
       occ |= (1ULL << sq);
     }
@@ -169,14 +168,12 @@ void generate_moves(Moves* moves) {
     Bitboard b = EMPTY;
     while (checkers) {
       int kingsq = PC_SQUARE(PTY_KING, side_to_move);
-      int checkersq = pop_lsb(&checkers);
+      int checkersq = lsb(checkers);
       b |= between_bb(checkersq, kingsq);
+      POP_LSB(checkers);
     }
     blockers |= b;
   }
-  // if (!MORE_THAN_ONE()) {
-
-  // }
 
   for (int from = 0; from < 64; ++from) {
     Piece pc = board[from];
@@ -205,20 +202,32 @@ void generate_moves(Moves* moves) {
     if (checkers_bb && pt != PTY_KING) {
       b &= blockers | checkers_bb;
     } else if (pt == PTY_KING) {
-      b &= ~attacked_bb;
+      Bitboard bb = b;
+      Bitboard attacked_bb = EMPTY;
+      while (bb) {
+        int to = lsb(bb);
+        if (!(attackers_to(to, OCCUPIED_SQUARES ^ SQBB(from)) & OPPONENT)) {
+          attacked_bb |= SQBB(to);
+        }
+        POP_LSB(bb);
+      }
+      b &= attacked_bb;
     }
 
     if (GET_BIT(pins[side_to_move], from)) {
-      Bitboard kingbb = piece[MAKE_PC(PTY_KING, side_to_move)];
-      int kingsq = pop_lsb(&kingbb);
+      int kingsq = PC_SQUARE(PTY_KING, side_to_move);
       Bitboard pinner = pinners[side_to_move ^ BLACK];
       while (pinner) {
-        int pinnersq = pop_lsb(&pinner);
+        int pinnersq = lsb(pinner);
         b &= between_bb(pinnersq, kingsq) | SQBB(pinnersq);
+        POP_LSB(pinner);
       }
     }
 
-    while (b) { MOVE_APPEND(moves, MOVE(from, pop_lsb(&b), 0)); }
+    while (b) {
+      MOVE_APPEND(moves, MOVE(from, lsb(b), 0));
+      POP_LSB(b);
+    }
     if (!castling || checkers_bb) {
       continue;
     }
@@ -261,31 +270,31 @@ Bitboard attacks_bb(PieceType pt, Square from, Bitboard occ) {
   return 0;
 }
 
-Bitboard pawn_attacks(Square sq, Color side) {
+FORCE_INLINE Bitboard pawn_attacks(Square sq, Color side) {
   return g_pawn_attacks[side][sq];
 }
 
-Bitboard knight_attacks(Square sq) { return g_knight_attacks[sq]; }
+FORCE_INLINE Bitboard knight_attacks(Square sq) { return g_knight_attacks[sq]; }
 
-Bitboard bishop_attacks(Square sq, Bitboard occ) {
+FORCE_INLINE Bitboard bishop_attacks(Square sq, Bitboard occ) {
   occ &= g_bishop_attacks[sq];
   occ *= g_bishop_magics[sq];
   occ >>= 64 - g_bishop_relavent_bits[sq];
   return g_bishop[sq][occ];
 }
 
-Bitboard rook_attacks(Square sq, Bitboard occ) {
+FORCE_INLINE Bitboard rook_attacks(Square sq, Bitboard occ) {
   occ &= g_rook_attacks[sq];
   occ *= g_rook_magics[sq];
   occ >>= 64 - g_rook_relavent_bits[sq];
   return g_rook[sq][occ];
 }
 
-Bitboard queen_attacks(Square sq, Bitboard occ) {
+FORCE_INLINE Bitboard queen_attacks(Square sq, Bitboard occ) {
   return bishop_attacks(sq, occ) | rook_attacks(sq, occ);
 }
 
-Bitboard king_attacks(Square sq) {
+FORCE_INLINE Bitboard king_attacks(Square sq) {
   Bitboard bb = SQBB(sq);
   Bitboard attacks = EMPTY;
   attacks |= (bb << 1) & ~FILE_H | (bb >> 1) & ~FILE_A | (bb << 8) | (bb >> 8);

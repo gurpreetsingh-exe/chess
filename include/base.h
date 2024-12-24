@@ -19,7 +19,7 @@ typedef struct string_view {
   size_t size;
 } string_view;
 
-#define FORCE_INLINE __attribute__((always_inline))
+#define FORCE_INLINE inline __attribute__((always_inline))
 
 #define PRAGMA(S) _Pragma(#S)
 #define PUSH_IGNORE_WARNING(W)                                                 \

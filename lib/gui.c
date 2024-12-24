@@ -312,9 +312,6 @@ void key_callback(GLFWwindow* win, int key, int scancode, int action,
       unmake_move(m);
       memcpy(gboard, board, sizeof(board));
     } break;
-    case GLFW_KEY_A: {
-      highlight_squares(attacked_bb);
-    } break;
     case GLFW_KEY_B: {
       highlight_squares(pins[BLACK] | pins[WHITE]);
     } break;
@@ -325,8 +322,6 @@ void key_callback(GLFWwindow* win, int key, int scancode, int action,
 }
 
 int main() {
-  engine_start();
-  return 0;
   if (!glfwInit()) {
     return -1;
   }
@@ -344,7 +339,7 @@ int main() {
     printf("GL version: %s\n", (const char*)glGetString(GL_VERSION));
   }
 
-  // engine_start();
+  engine_start();
   // reset_position();
   // set_position("4r2k/8/8/8/4B3/8/8/4K3 w - -");
   memcpy(gboard, board, sizeof(board));

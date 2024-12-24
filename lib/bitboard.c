@@ -50,7 +50,7 @@ void print_bitboard(Bitboard bb) {
   printf("      a b c d e f g h\n\n");
 }
 
-Bitboard between_bb(Square sq1, Square sq2) {
+FORCE_INLINE Bitboard between_bb(Square sq1, Square sq2) {
   const Bitboard m1 = -1ULL;
   const Bitboard a2a7 = 0x0001010101010100ULL;
   const Bitboard b2g7 = 0x0040201008040200ULL;
@@ -77,11 +77,7 @@ Bitboard attackers_to(Square sq, Bitboard occ) {
          (king_attacks(sq) & type[PTY_KING]);
 }
 
-// Bitboard attacked_squares(Square sq) {
-//     return
-// }
-
-int count_bits(Bitboard bb) {
+FORCE_INLINE int count_bits(Bitboard bb) {
   int count = 0;
   while (bb) {
     count++;
@@ -90,7 +86,8 @@ int count_bits(Bitboard bb) {
   return count;
 }
 
-int lsb(Bitboard bb) {
+FORCE_INLINE int lsb(Bitboard bb) {
+  ASAN_BREAKPOINT(bb);
   assert(bb);
 #if defined(__GNUC__)
   return __builtin_ctzll(bb);

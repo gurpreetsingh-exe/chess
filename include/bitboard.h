@@ -9,6 +9,7 @@ typedef uint64_t Bitboard;
 #define FLIP_BIT(n, bit) (n ^= (1ULL << (bit)))
 #define POP_BIT(n, bit) (GET_BIT(n, bit) ? n ^= (1ULL << (bit)) : 0)
 #define MORE_THAN_ONE(n) ((n) & ((n)-1))
+#define POP_LSB(n) n &= n - 1
 
 #define SQBB(i) (1ULL << (i))
 
