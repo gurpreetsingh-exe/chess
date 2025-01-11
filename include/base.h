@@ -21,6 +21,7 @@ typedef struct string_view {
 
 #define FORCE_INLINE inline __attribute__((always_inline))
 
+#define ARRLEN(arr) sizeof(arr) / sizeof(arr[0])
 #define PRAGMA(S) _Pragma(#S)
 #define PUSH_IGNORE_WARNING(W)                                                 \
   PRAGMA(GCC diagnostic push) PRAGMA(GCC diagnostic ignored W)

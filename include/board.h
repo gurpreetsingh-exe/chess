@@ -28,6 +28,14 @@ extern StateInfo state_info[MAX_MOVES_COUNT];
 extern size_t si_current_idx;
 #define SICURR state_info[si_current_idx]
 
+/// types of moves
+typedef struct MoveCount {
+  size_t captures;
+  size_t epassant;
+  size_t castles;
+} MoveCount;
+extern MoveCount move_count;
+
 #define OCCUPIED_SQUARES type[ALL_PIECES]
 #define EMPTY_SQUARES ~OCCUPIED_SQUARES
 #define US color_bb[side_to_move]

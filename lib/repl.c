@@ -57,7 +57,5 @@ void start_repl() {
     } else {
       parse_input(input);
     }
-
-    // printf("%s%c", input, end - input == 0 ? '\0' : '\n');
   }
 }

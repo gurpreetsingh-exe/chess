@@ -47,5 +47,7 @@ int pop_lsb(Bitboard*);
 void print_bitboard(Bitboard);
 void print_attack_bitboard(Bitboard, Bitboard);
 Bitboard between_bb(Square, Square);
+void init_bitboards();
 Bitboard attackers_to(Square, Bitboard);
+bool is_attacked(Square, Bitboard, Color);
 Bitboard find_magic_number(int, int, bool);

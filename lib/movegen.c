@@ -164,6 +164,26 @@ Bitboard quiet_pawn_moves(Square sq, Color color) {
 void generate_moves(Moves* moves) {
   Bitboard checkers = checkers_bb;
   Bitboard blockers = EMPTY;
+  if (checkers && MORE_THAN_ONE(checkers)) {
+    int kingsq = PC_SQUARE(PTY_KING, side_to_move);
+    Bitboard b = king_attacks(kingsq) & ~US;
+    Bitboard bb = b;
+    Bitboard attacked_bb = EMPTY;
+    while (bb) {
+      int to = lsb(bb);
+      if (!(attackers_to(to, OCCUPIED_SQUARES ^ SQBB(kingsq)) & OPPONENT)) {
+        attacked_bb |= SQBB(to);
+      }
+      POP_LSB(bb);
+    }
+    b &= attacked_bb;
+    while (b) {
+      MOVE_APPEND(moves, MOVE(kingsq, lsb(b), 0));
+      POP_LSB(b);
+    }
+    return;
+  }
+
   if (checkers) {
     Bitboard b = EMPTY;
     while (checkers) {
@@ -216,12 +236,19 @@ void generate_moves(Moves* moves) {
 
     if (GET_BIT(pins[side_to_move], from)) {
       int kingsq = PC_SQUARE(PTY_KING, side_to_move);
-      Bitboard pinner = pinners[side_to_move ^ BLACK];
+      Bitboard pinner = pinners[side_to_move ^ BLACK] & b;
+      Bitboard pb = EMPTY;
       while (pinner) {
         int pinnersq = lsb(pinner);
-        b &= between_bb(pinnersq, kingsq) | SQBB(pinnersq);
+        Bitboard movebb = between_bb(pinnersq, kingsq);
+        if (!(movebb & SQBB(from))) {
+          POP_LSB(pinner);
+          continue;
+        }
+        pb |= (movebb | SQBB(pinnersq)) & b;
         POP_LSB(pinner);
       }
+      b &= pb;
     }
 
     while (b) {
@@ -235,20 +262,32 @@ void generate_moves(Moves* moves) {
     if (pc == PC_W_KING) {
       if (castling & CASTLE_W_KINGSIDE && board[f1] == NO_PIECE &&
           board[g1] == NO_PIECE) {
-        MOVE_APPEND(moves, MOVE(from, g1, CASTLING));
+        if (!(is_attacked(f1, OCCUPIED_SQUARES, BLACK) ||
+              is_attacked(g1, OCCUPIED_SQUARES, BLACK))) {
+          MOVE_APPEND(moves, MOVE(from, g1, CASTLING));
+        }
       }
       if (castling & CASTLE_W_QUEENSIDE && board[b1] == NO_PIECE &&
           board[c1] == NO_PIECE && board[d1] == NO_PIECE) {
-        MOVE_APPEND(moves, MOVE(from, c1, CASTLING));
+        if (!(is_attacked(c1, OCCUPIED_SQUARES, BLACK) ||
+              is_attacked(d1, OCCUPIED_SQUARES, BLACK))) {
+          MOVE_APPEND(moves, MOVE(from, c1, CASTLING));
+        }
       }
     } else if (pc == PC_B_KING) {
       if (castling & CASTLE_B_KINGSIDE && board[f8] == NO_PIECE &&
           board[g8] == NO_PIECE) {
-        MOVE_APPEND(moves, MOVE(from, g8, CASTLING));
+        if (!(is_attacked(f8, OCCUPIED_SQUARES, WHITE) ||
+              is_attacked(g8, OCCUPIED_SQUARES, WHITE))) {
+          MOVE_APPEND(moves, MOVE(from, g8, CASTLING));
+        }
       }
       if (castling & CASTLE_B_QUEENSIDE && board[b8] == NO_PIECE &&
           board[c8] == NO_PIECE && board[d8] == NO_PIECE) {
-        MOVE_APPEND(moves, MOVE(from, c8, CASTLING));
+        if (!(is_attacked(c8, OCCUPIED_SQUARES, WHITE) ||
+              is_attacked(d8, OCCUPIED_SQUARES, WHITE))) {
+          MOVE_APPEND(moves, MOVE(from, c8, CASTLING));
+        }
       }
     }
   }
@@ -370,6 +409,7 @@ Bitboard rook_attacks_on_the_fly(Square sq, Bitboard occ) {
 }
 
 void init_leaper_attacks() {
+  init_bitboards();
   for (int sq = SQ_ZERO; sq < SQ_NB; ++sq) {
     // Pawn attacks
     g_pawn_attacks[WHITE][sq] = pawn_attacks_mask(sq, WHITE);

@@ -6,13 +6,12 @@
 
 #include "bitboard.h"
 #include "board.h"
+#include "engine.h"
 #include "move.h"
 #include "movegen.h"
 #include "types.h"
 
 #include <GLFW/glfw3.h>
-
-#define ARRLEN(arr) sizeof(arr) / sizeof(arr[0])
 
 #define UPLOAD_PIECE(pc, i)                                                    \
   {                                                                            \
@@ -194,8 +193,6 @@ char* read_file(const char* path) {
   fclose(f);
   return content;
 }
-
-extern int engine_start();
 
 int get_square() {
   double x, y;

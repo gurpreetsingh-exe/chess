@@ -16,6 +16,8 @@ Moves prev_moves;
 StateInfo state_info[MAX_MOVES_COUNT];
 size_t si_current_idx = 0;
 
+MoveCount move_count;
+
 #define UNSET_CASTLING(c)                                                      \
   if (castling & (c)) {                                                        \
     castling ^= (c);                                                           \
@@ -47,7 +49,12 @@ static void update_pins(Color c) {
   pins[c] = EMPTY;
   while (pinner) {
     int sq = lsb(pinner);
-    Bitboard b = between_bb(sq, king_sq) & occ;
+    Bitboard bw = between_bb(sq, king_sq);
+    if (bw & OPPONENT) {
+      POP_LSB(pinner);
+      continue;
+    }
+    Bitboard b = bw & occ;
     if (b && !MORE_THAN_ONE(b)) {
       pins[c] |= b;
       if (b & color_bb[c]) {
@@ -59,8 +66,8 @@ static void update_pins(Color c) {
 }
 
 void update_check_info() {
-  Color us = side_to_move;
-  Color them = side_to_move ^ BLACK;
+  Color us = side_to_move ^ BLACK;
+  Color them = side_to_move;
   update_pins(them);
   checkers_bb =
       attackers_to(PC_SQUARE(PTY_KING, them), type[ALL_PIECES]) & color_bb[us];
@@ -113,10 +120,12 @@ void make_move(Move move) {
                 (side_to_move ? d8 : d1) + 2 * king_side);
       UNSET_CASTLING(side_to_move ? (CASTLE_B_KINGSIDE | CASTLE_B_QUEENSIDE)
                                   : (CASTLE_W_KINGSIDE | CASTLE_W_QUEENSIDE))
+      move_count.castles++;
     } break;
     case EN_PASSANT: {
       Square sq = to + (side_to_move ? 8 : -8);
       SICURR.captured = take_piece(sq);
+      move_count.epassant++;
     } break;
     case PROMOTION: {
       assert(false && "not implemented");
@@ -142,13 +151,14 @@ void make_move(Move move) {
   if (!flags && board[to]) {
     Piece captured = take_piece(to);
     SICURR.captured = captured;
+    move_count.captures++;
     if (PC_TYPE(captured) == PTY_ROOK) {
       UNSET_CASTLING(square_to_castling_side(to));
     }
   }
   put_piece(pc, to);
-  update_check_info();
   side_to_move = side_to_move ^ BLACK;
+  update_check_info();
   MOVE_APPEND(&prev_moves, move);
   si_current_idx++;
 }
@@ -211,6 +221,8 @@ void reset_position() {
   memset(state_info, 0, sizeof(state_info));
   MOVE_INIT(prev_moves);
   si_current_idx = 0;
+
+  memset(&move_count, 0, sizeof(move_count));
 }
 
 void set_position(const char* fen) {
@@ -231,7 +243,7 @@ void set_position(const char* fen) {
     }
     i++;
   }
-  assert(fen[i++] == ' ');
+  i++;
   token = fen[i++];
   if (token == 'b') {
     side_to_move = BLACK;
